@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Disk Usage</title>
+
+    <style type="text/css">
+      * { margin: 0; padding: 0; }
+
+      #chart {
+        background-color: white;
+        font: 14px sans-serif;
+        margin: 0 auto 50px;
+        width: 600px;
+        height: 600px;
+      }
+        #chart .label{
+          fill: #404040;
+          font-size: 12px;
+        }
+    </style>
+  </head>
+
+  <body>
+    <div id="chart"></div>
+    <div id="lastModified"></div>
+    <div id="totalSize"></div>
+  </body>
+
+  <script src="http://d3js.org/d3.v3.min.js"></script>
+  <script type="text/javascript">
+    var width  = 800;
+        height = 800;
+        radius = width / 2.5;
+
+    var pie = d3.layout.pie()
+                .value(function(d) { return d.size; })
+
+function getReadableFileSizeString(fileSizeInkBytes) {
+
+    var i = 0;
+    var byteUnits = [' kB', ' MB', ' GB', ' TB', 'PB', 'EB', 'ZB', 'YB'];
+    do {
+        fileSizeInkBytes = fileSizeInkBytes / 1024;
+        i++;
+    } while (fileSizeInkBytes > 1024);
+
+    return Math.max(fileSizeInBytes, 0.1).toFixed(1) + byteUnits[i];
+};
+
+d3.json("js/data.json", function(error, json) {
+  if (error) return console.warn(error);
+  visualizeit(json);
+});
+
+d3.json("js/lastRun.json", function(error, json) {
+  if(error) return console.warn(error);
+  d3.selectAll('#lastModified').text('Last Modified: '+json.timestamp);
+});
+
+function visualizeit(data) {
+    var pieData = pie(data);
+    var color = d3.scale.category20();
+
+    var total = d3.sum(pieData.map(function(d) {
+      return d.value;
+    }));
+
+    d3.selectAll('#totalSize').text('Total Size: '+getReadableFileSizeString(total)+' ('+total+')');
+
+    var arc = d3.svg.arc()
+    .outerRadius(radius - 20)
+    .innerRadius(radius - 90);
+
+    var svg = d3.select("#chart").append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .append("g")
+                .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+
+    var ticks = svg.selectAll("line")
+                  .data(pieData)
+                  .enter()
+                  .append("line");
+
+    ticks.attr("x1", 0)
+         .attr("x2", 0)
+         .attr("y1", -radius+4)
+         .attr("y2", -radius-2)
+         .attr("stroke", "gray")
+         .attr("transform", function(d) {
+           return "rotate(" + (d.startAngle+d.endAngle)/2 * (180/Math.PI) + ")";
+         })
+        .style("visibility", function(d) {
+          return d.value/total < 0.01 ? "hidden" : "visible";
+        });
+
+    var labels = svg.selectAll("text")
+                  .data(pieData)
+                  .enter()
+                  .append("text");
+
+    labels.attr("class", "label")
+          .style("visibility", function(d) {
+            return d.value/total < 0.01 ? "hidden" : "visible";
+          })
+          .attr("transform", function(d) {
+             var dist   = radius + 40;
+                 angle  = (d.startAngle + d.endAngle) / 2;
+                 x      = dist * Math.sin(angle);
+                 y      = -dist * Math.cos(angle);
+             return "translate(" + x + "," + y + ")";
+           })
+          .attr("dy", "0.35em")
+          .attr("text-anchor", "middle")
+          .html(function(d){
+            return d.data.name.replace("/home/","") + "(" + getReadableFileSizeString(d.value)+")";
+          });
+
+    var path = svg.selectAll("path")
+                 .data(pieData)
+                 .enter()
+                 .append("path")
+                 .attr("fill", function(d, i) { return color(i); })
+                 .attr("d", arc);
+
+}
+
+  </script>
+</html>
